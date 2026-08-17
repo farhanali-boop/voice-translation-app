@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VoiceBridge — Speak Without Borders</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#060c1a;--c2:#0d1530;
+      --neon:#00d4ff;--neon2:#7c3aed;
+      --glass:rgba(255,255,255,0.04);
+      --glassborder:rgba(255,255,255,0.10);
+      --text:#f0f6ff;--textdim:#6a8aaa;
+      --r:18px;
+    }
+    html,body{height:100%;overflow:hidden}
+    body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;position:relative}
+    #bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+    .grid-overlay{
+      position:fixed;inset:0;z-index:1;pointer-events:none;
+      background-image:linear-gradient(rgba(0,212,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.025) 1px,transparent 1px);
+      background-size:60px 60px;
+      mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black 20%,transparent 100%);
+    }
+
+    .wrapper{
+      position:relative;z-index:10;
+      display:flex;align-items:stretch;gap:56px;
+      padding:20px;max-width:980px;width:100%;
+    }
+
+    /* ─── LEFT: BRAND ─────────────────────────────── */
+    .brand-side{
+      flex:1;display:flex;flex-direction:column;justify-content:center;gap:32px;
+      animation:fadeUp .9s cubic-bezier(.22,1,.36,1) both;
+    }
+    @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+
+    /* Animated Voice Globe Logo */
+    .vlogo{position:relative;width:150px;height:150px}
+    .vl-glow{
+      position:absolute;inset:-20px;border-radius:50%;
+      background:radial-gradient(circle,rgba(0,212,255,0.12),transparent 65%);
+      animation:glowPulse 3s ease-in-out infinite;
+    }
+    @keyframes glowPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.15);opacity:1}}
+    .vl-orbit{
+      position:absolute;inset:0;border-radius:50%;
+      border:1px dashed rgba(0,212,255,0.2);
+      animation:orbit 8s linear infinite;
+    }
+    .vl-orbit::before{
+      content:'';position:absolute;width:8px;height:8px;border-radius:50%;
+      background:var(--neon);box-shadow:0 0 8px var(--neon);
+      top:-4px;left:50%;transform:translateX(-50%);
+    }
+    @keyframes orbit{to{transform:rotate(360deg)}}
+    .vl-orbit2{
+      position:absolute;inset:16px;border-radius:50%;
+      border:1px dashed rgba(124,58,237,0.25);
+      animation:orbit 5s linear infinite reverse;
+    }
+    .vl-orbit2::before{
+      content:'';position:absolute;width:6px;height:6px;border-radius:50%;
+      background:#a78bfa;box-shadow:0 0 6px #a78bfa;
+      bottom:-3px;left:50%;transform:translateX(-50%);
+    }
+    .vl-core{
+      position:absolute;inset:28px;border-radius:50%;
+      background:linear-gradient(135deg,#0a1e3d,#0d2a50);
+      border:1.5px solid rgba(0,212,255,0.45);
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 28px rgba(0,212,255,0.25),0 0 56px rgba(0,212,255,0.08),inset 0 0 16px rgba(0,212,255,0.06);
+    }
+    .wave-bars{display:flex;align-items:center;gap:3px;height:30px}
+    .wb{width:3.5px;border-radius:3px;background:linear-gradient(to top,var(--neon),#a78bfa);animation:wa 1.4s ease-in-out infinite}
+    .wb:nth-child(1){height:8px;animation-delay:0s}
+    .wb:nth-child(2){height:18px;animation-delay:.12s}
+    .wb:nth-child(3){height:26px;animation-delay:.24s}
+    .wb:nth-child(4){height:14px;animation-delay:.36s}
+    .wb:nth-child(5){height:22px;animation-delay:.18s}
+    .wb:nth-child(6){height:10px;animation-delay:.06s}
+    .wb:nth-child(7){height:16px;animation-delay:.3s}
+    @keyframes wa{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.6)}}
+
+    .brand-text{}
+    .brand-name{
+      font-size:2.8rem;font-weight:900;letter-spacing:-.05em;line-height:1;
+      background:linear-gradient(120deg,#ffffff 0%,#00d4ff 40%,#a78bfa 80%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .brand-tagline{margin-top:6px;font-size:.88rem;color:var(--textdim);letter-spacing:.1em;text-transform:uppercase;font-weight:400}
+
+    .lang-row{display:flex;flex-wrap:wrap;gap:7px}
+    .lbadge{
+      padding:4px 13px;border-radius:20px;font-size:.71rem;font-weight:600;
+      background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.12);color:#7dd3fc;
+      letter-spacing:.03em;
+    }
+
+    .feat-grid{display:flex;flex-direction:column;gap:8px}
+    .fi{
+      display:flex;align-items:center;gap:12px;
+      padding:9px 14px;border-radius:10px;
+      background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.05);
+      font-size:.82rem;color:var(--textdim);
+    }
+    .fi-dot{width:6px;height:6px;border-radius:50%;background:var(--neon);flex-shrink:0;box-shadow:0 0 5px var(--neon)}
+
+    /* ─── RIGHT: CARD ─────────────────────────────── */
+    .auth-side{
+      width:390px;flex-shrink:0;
+      animation:fadeUp .9s cubic-bezier(.22,1,.36,1) .18s both;
+    }
+    .card{
+      background:rgba(13,21,48,0.7);
+      backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+      border:1px solid rgba(255,255,255,0.09);
+      border-radius:var(--r);padding:30px 26px;
+      box-shadow:0 24px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(0,212,255,0.04);
+      position:relative;overflow:hidden;
+    }
+    .card::before{
+      content:'';position:absolute;top:-80px;right:-80px;width:220px;height:220px;
+      border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,0.06),transparent 65%);pointer-events:none;
+    }
+    .card::after{
+      content:'';position:absolute;bottom:-60px;left:-60px;width:180px;height:180px;
+      border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,0.07),transparent 65%);pointer-events:none;
+    }
+
+    .tabs{display:flex;background:rgba(0,0,0,0.4);border-radius:12px;padding:4px;gap:4px;margin-bottom:26px}
+    .tab{
+      flex:1;padding:10px;border:none;border-radius:9px;cursor:pointer;
+      font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:600;
+      background:transparent;color:var(--textdim);transition:all .25s;
+    }
+    .tab.active{
+      background:linear-gradient(135deg,rgba(0,212,255,0.18),rgba(124,58,237,0.18));
+      color:#e0f2fe;border:1px solid rgba(0,212,255,0.25);
+      box-shadow:0 2px 12px rgba(0,212,255,0.1);
+    }
+
+    .tp{display:none;flex-direction:column;gap:15px}
+    .tp.active{display:flex}
+    .tp-head{font-size:1.3rem;font-weight:700;letter-spacing:-.02em}
+    .tp-sub{font-size:.8rem;color:var(--textdim)}
+
+    .fld{display:flex;flex-direction:column;gap:6px}
+    .fld label{font-size:.71rem;font-weight:600;color:var(--textdim);text-transform:uppercase;letter-spacing:.07em}
+    .inp-wrap{position:relative}
+    .inp-ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.95rem;opacity:.45;pointer-events:none}
+    input[type=text],input[type=email],input[type=password]{
+      width:100%;padding:11px 14px 11px 38px;
+      background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.07);
+      border-radius:10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.92rem;
+      outline:none;transition:border-color .2s,box-shadow .2s;
+    }
+    input:focus{border-color:rgba(0,212,255,0.45);box-shadow:0 0 0 3px rgba(0,212,255,0.07)}
+    input::placeholder{color:rgba(100,130,165,0.5)}
+
+    .btn{
+      display:flex;align-items:center;justify-content:center;gap:10px;
+      padding:13px;border:none;border-radius:12px;cursor:pointer;
+      background:linear-gradient(135deg,#0ea5e9 0%,#6d28d9 100%);
+      color:#fff;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;
+      transition:all .25s;position:relative;overflow:hidden;
+    }
+    .btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent);opacity:0;transition:opacity .2s}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(14,165,233,0.38)}
+    .btn:hover::after{opacity:1}
+    .btn:active{transform:translateY(0)}
+    .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+    .btn .arr{font-size:1.1rem;transition:transform .2s}
+    .btn:hover .arr{transform:translateX(5px)}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    .sp{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;display:none}
+    .loading .sp{display:block}.loading .bt{display:none}.loading .arr{display:none}
+
+    .msgbox{font-size:.8rem;border-radius:8px;padding:8px 12px;display:none;text-align:center}
+    .msgbox.show{display:block}
+    .msgbox.err{background:rgba(244,63,94,0.1);color:#f87171;border:1px solid rgba(244,63,94,0.18)}
+    .msgbox.ok{background:rgba(16,185,129,0.1);color:#34d399;border:1px solid rgba(16,185,129,0.18)}
+
+    .card-footer{display:flex;align-items:center;gap:8px;margin-top:6px;color:var(--textdim);font-size:.72rem;justify-content:center}
+    .card-footer::before,.card-footer::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.06)}
+
+    @media(max-width:760px){
+      html,body{overflow:auto}
+      .wrapper{flex-direction:column;gap:20px;padding:20px 14px;height:auto}
+      .brand-side{display:none}
+      .auth-side{width:100%;max-width:420px;align-self:center}
+    }
+  </style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="grid-overlay"></div>
+
+<div class="wrapper">
+  <!-- LEFT: Brand -->
+  <div class="brand-side">
+    <div class="vlogo">
+      <div class="vl-glow"></div>
+      <div class="vl-orbit"></div>
+      <div class="vl-orbit2"></div>
+      <div class="vl-core">
+        <div class="wave-bars">
+          <div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div>
+          <div class="wb"></div><div class="wb"></div><div class="wb"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-text">
+      <div class="brand-name">VoiceBridge</div>
+      <div class="brand-tagline">Speak Without Borders</div>
+    </div>
+
+    <div class="lang-row">
+      <span class="lbadge">🇬🇧 English</span><span class="lbadge">🇵🇰 Urdu</span>
+      <span class="lbadge">🇫🇷 French</span><span class="lbadge">🇩🇪 German</span>
+      <span class="lbadge">🇯🇵 Japanese</span><span class="lbadge">🇨🇳 Chinese</span>
+      <span class="lbadge">🇸🇦 Arabic</span><span class="lbadge">🇷🇺 Russian</span>
+    </div>
+
+    <div class="feat-grid">
+      <div class="fi"><div class="fi-dot"></div>Real-time voice transcription via Whisper AI</div>
+      <div class="fi"><div class="fi-dot"></div>Instant neural machine translation</div>
+      <div class="fi"><div class="fi-dot"></div>Natural text-to-speech audio playback</div>
+      <div class="fi"><div class="fi-dot"></div>Full searchable translation history</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Auth Card -->
+  <div class="auth-side">
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" data-p="login">Sign In</button>
+        <button class="tab" data-p="register">Register</button>
+      </div>
+
+      <div class="tp active" id="p-login">
+        <div class="tp-head">Welcome back 👋</div>
+        <div class="tp-sub">Sign in to your VoiceBridge account</div>
+        <div class="fld">
+          <label>Username</label>
+          <div class="inp-wrap"><span class="inp-ico">👤</span>
+            <input type="text" id="l-u" placeholder="your_username" autocomplete="username"/>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Password</label>
+          <div class="inp-wrap"><span class="inp-ico">🔒</span>
+            <input type="password" id="l-p" placeholder="••••••••" autocomplete="current-password"/>
+          </div>
+        </div>
+        <div class="msgbox" id="l-m"></div>
+        <button class="btn" id="l-btn"><div class="sp"></div><span class="bt">Sign In</span><span class="arr">→</span></button>
+      </div>
+
+      <div class="tp" id="p-register">
+        <div class="tp-head">Join VoiceBridge ✨</div>
+        <div class="tp-sub">Create your free account</div>
+        <div class="fld">
+          <label>Username</label>
+          <div class="inp-wrap"><span class="inp-ico">👤</span>
+            <input type="text" id="r-u" placeholder="choose_username" autocomplete="username"/>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Email</label>
+          <div class="inp-wrap"><span class="inp-ico">📧</span>
+            <input type="email" id="r-e" placeholder="you@email.com" autocomplete="email"/>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Password</label>
+          <div class="inp-wrap"><span class="inp-ico">🔒</span>
+            <input type="password" id="r-p" placeholder="min. 6 characters" autocomplete="new-password"/>
+          </div>
+        </div>
+        <div class="msgbox" id="r-m"></div>
+        <button class="btn" id="r-btn"><div class="sp"></div><span class="bt">Create Account</span><span class="arr">→</span></button>
+      </div>
+
+      <div class="card-footer">Whisper AI · gTTS · Socket.IO</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API="http://localhost:5000";
+
+/* Particle canvas */
+(function(){
+  const cv=document.getElementById('bg-canvas'),cx=cv.getContext('2d');
+  let W,H,pts=[];
+  const resize=()=>{W=cv.width=innerWidth;H=cv.height=innerHeight;init()};
+  const init=()=>{pts=[];for(let i=0;i<55;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()*1.2+.4,h:Math.random()>.5?195:270})};
+  const draw=()=>{
+    cx.clearRect(0,0,W,H);
+    const g=cx.createRadialGradient(W*.25,H*.35,.1,W*.25,H*.35,W*.7);
+    g.addColorStop(0,'#0c1832');g.addColorStop(.6,'#080e1c');g.addColorStop(1,'#040810');
+    cx.fillStyle=g;cx.fillRect(0,0,W,H);
+    const g2=cx.createRadialGradient(W*.82,H*.72,.1,W*.82,H*.72,W*.4);
+    g2.addColorStop(0,'rgba(100,40,200,0.07)');g2.addColorStop(1,'transparent');
+    cx.fillStyle=g2;cx.fillRect(0,0,W,H);
+    pts.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1;
+      cx.beginPath();cx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      cx.fillStyle=`hsla(${p.h},90%,72%,0.55)`;cx.fill();
+    });
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+      const d=Math.hypot(pts[i].x-pts[j].x,pts[i].y-pts[j].y);
+      if(d<110){cx.beginPath();cx.moveTo(pts[i].x,pts[i].y);cx.lineTo(pts[j].x,pts[j].y);cx.strokeStyle=`rgba(0,200,255,${(1-d/110)*0.07})`;cx.lineWidth=.4;cx.stroke()}
+    }
+    requestAnimationFrame(draw);
+  };
+  window.addEventListener('resize',resize);resize();draw();
+})();
+
+/* Tabs */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab,.tp').forEach(e=>e.classList.remove('active'));
+  t.classList.add('active');document.getElementById('p-'+t.dataset.p).classList.add('active');
+}));
+
+const showMsg=(id,txt,type)=>{const e=document.getElementById(id);e.textContent=txt;e.className='msgbox show '+(type==='ok'?'ok':'err')};
+const setLoad=(b,on)=>{b.classList.toggle('loading',on);b.disabled=on};
+
+/* Login */
+document.getElementById('l-btn').addEventListener('click',async()=>{
+  const b=document.getElementById('l-btn');setLoad(b,true);
+  const body={username:document.getElementById('l-u').value.trim(),password:document.getElementById('l-p').value};
+  if(!body.username||!body.password){showMsg('l-m','Please fill in all fields.');setLoad(b,false);return}
+  try{
+    const r=await fetch(`${API}/api/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok)showMsg('l-m',d.error||'Login failed.');
+    else{localStorage.setItem('vb_token',d.token);localStorage.setItem('vb_user',d.username);showMsg('l-m','Welcome back! Loading…','ok');setTimeout(()=>location.href='translate.html',700)}
+  }catch{showMsg('l-m','Cannot reach server. Start the backend first.')}
+  setLoad(b,false);
+});
+
+/* Register */
+document.getElementById('r-btn').addEventListener('click',async()=>{
+  const b=document.getElementById('r-btn');setLoad(b,true);
+  const body={username:document.getElementById('r-u').value.trim(),email:document.getElementById('r-e').value.trim(),password:document.getElementById('r-p').value};
+  if(!body.username||!body.email||!body.password){showMsg('r-m','Please fill in all fields.');setLoad(b,false);return}
+  try{
+    const r=await fetch(`${API}/api/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok)showMsg('r-m',d.error||'Registration failed.');
+    else{showMsg('r-m','Account created! Please sign in.','ok');setTimeout(()=>{document.querySelector('[data-p="login"]').click();document.getElementById('l-u').value=body.username},800)}
+  }catch{showMsg('r-m','Cannot reach server.')}
+  setLoad(b,false);
+});
+
+['l-u','l-p'].forEach(id=>document.getElementById(id)?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('l-btn').click()}));
+['r-u','r-e','r-p'].forEach(id=>document.getElementById(id)?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('r-btn').click()}));
+if(localStorage.getItem('vb_token'))location.href='translate.html';
+</script>
+</body>
+</html>
