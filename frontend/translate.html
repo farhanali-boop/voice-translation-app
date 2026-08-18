@@ -209,7 +209,7 @@ const setSt=(t,s)=>{document.getElementById("st-txt").textContent=t;document.get
 let socket=null,wsOk=false;
 function initSocket(){
   if(typeof io==="undefined")return;
-  socket=io(API,{query:{token:tok()},transports:["websocket","polling"]});
+ socket=io(API,{query:{token:tok()},transports:["polling","websocket"]});
   socket.on("connect",()=>{wsOk=true;setWs(true);setSt("Connected — Click mic to start",false)});
   socket.on("disconnect",()=>{wsOk=false;setWs(false)});
   socket.on("connect_error",()=>{wsOk=false;setWs(false)});
@@ -222,11 +222,103 @@ function initSocket(){
 function setWs(on){document.getElementById("ws-pill").classList.toggle("on",on);document.getElementById("ws-label").textContent=on?"Live":"Offline";}
 initSocket();
 
-/* ── AUDIO QUEUE — Fix playback ── */
-const audioQueue=[];
-let isPlaying=false;
-let lastB64=null;
+/* ── AUDIO QUEUE ── */
+const audioQueue = [];
+let isPlaying = false;
+let lastB64 = null;
+let audioCtxOut = null;
 
+async function unlockAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+
+    if (!AC) return;
+
+    if (!audioCtxOut) {
+      audioCtxOut = new AC();
+    }
+
+    if (audioCtxOut.state === "suspended") {
+      await audioCtxOut.resume();
+    }
+
+    console.log("🔊 Audio ready:", audioCtxOut.state);
+
+  } catch (e) {
+    console.error("Audio unlock error:", e);
+  }
+}
+
+function enqueueAudio(b64) {
+
+  if (!b64) {
+    console.warn("No audio received");
+    return;
+  }
+
+  console.log("🔊 New translation audio received");
+
+  lastB64 = b64;
+
+  audioQueue.push(b64);
+
+  if (!isPlaying) {
+    playNext();
+  }
+}
+
+async function playNext() {
+
+  if (!audioQueue.length) {
+    isPlaying = false;
+    return;
+  }
+
+  isPlaying = true;
+
+  const b64 = audioQueue.shift();
+
+  try {
+
+    await unlockAudio();
+
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    const audioBuffer =
+      await audioCtxOut.decodeAudioData(bytes.buffer);
+
+    console.log(
+      "🔊 Playing audio:",
+      audioBuffer.duration.toFixed(2),
+      "seconds"
+    );
+
+    const source = audioCtxOut.createBufferSource();
+
+    source.buffer = audioBuffer;
+    source.connect(audioCtxOut.destination);
+
+    source.onended = () => {
+      isPlaying = false;
+      playNext();
+    };
+
+    source.start(0);
+
+  } catch (err) {
+
+    console.error("❌ Audio playback failed:", err);
+
+    isPlaying = false;
+
+    setTimeout(playNext, 100);
+  }
+}
 function enqueueAudio(b64){
   lastB64=b64;
   audioQueue.push(b64);
@@ -271,6 +363,7 @@ document.getElementById("mic-btn").addEventListener("click",async()=>{
 
 async function startSession(){
   try{
+    await unlockAudio();
     stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
     isOn=true;firstChunk=true;isBusy=false;
     setMicUI(true);startViz(stream);recordChunk();
@@ -298,7 +391,7 @@ function recordChunk(){
     /* 3 second chunks */
     setTimeout(()=>{
       if(mediaRec&&mediaRec.state==="recording") mediaRec.stop();
-    },3000);
+    },6000);
   }catch(e){console.error(e)}
 }
 
@@ -338,6 +431,7 @@ async function processChunk(){
 /* ── ON RESULT ── */
 function onResult(d){
   isBusy=false;
+  console.log("🔊 Audio data received:", !!d.audio_b64, d.audio_b64?.length);
   if(!d.source_text||!d.source_text.trim()){
     setSt(isOn?"🔴 Listening…":"Ready",false);return;
   }
@@ -406,7 +500,12 @@ function setMicUI(on){
 }
 
 /* Replay last */
-document.getElementById("play-btn").addEventListener("click",()=>{if(lastB64)enqueueAudio(lastB64)});
+document.getElementById("play-btn").addEventListener("click", async () => {
+  if (!lastB64) return;
+
+  await unlockAudio();
+  enqueueAudio(lastB64);
+});
 
 /* Clear */
 document.getElementById("clear-btn").addEventListener("click",()=>{
